@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financiero Personal</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <style>
+        /* ==================== ADVERTENCIA DE SEGURIDAD ==================== */
+        /* ESTE ARCHIVO CONTIENE TU TOKEN DE NOTION EN EL CÓDIGO JAVASCRIPT */
+        /* NO LO COMPARTAS, NO LO SUBAS A GITHUB PÚBLICO */
+        /* SOLO PARA USO LOCAL EN TU COMPUTADORA */
+        /* ================================================================= */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Manrope', sans-serif;
+        }
+        
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        /* Header */
+        header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 0;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .logo {
+            width: 2.5rem;
+            height: 2.5rem;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .header-title h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 0.125rem;
+        }
+        
+        .header-title p {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .refresh-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #475569;
+            transition: all 0.2s;
+        }
+        
+        .refresh-btn:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+        
+        .refresh-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .refresh-btn.loading svg {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Main Content */
+        main {
+            padding: 2rem 0;
+        }
+        
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .summary-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
+        }
+        
+        .summary-card:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+        
+        .summary-card.balance {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+        }
+        
+        .card-content {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+        
+        .card-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+        
+        .summary-card.balance .card-label {
+            color: #cbd5e1;
+        }
+        
+        .card-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        
+        .card-value.income {
+            color: #10b981;
+        }
+        
+        .card-value.expense {
+            color: #f43f5e;
+        }
+        
+        .card-value.balance {
+            color: white;
+        }
+        
+        .card-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .icon-income {
+            background: #dcfce7;
+            color: #10b981;
+        }
+        
+        .icon-expense {
+            background: #ffe4e6;
+            color: #f43f5e;
+        }
+        
+        .icon-balance {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+        
+        @media (min-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 5fr 7fr;
+            }
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+        
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 1.5rem;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+        
+        /* Expense List */
+        .expense-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .expense-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        
+        .expense-item:hover {
+            background-color: #f8fafc;
+        }
+        
+        .expense-color {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .expense-info {
+            flex: 1;
+        }
+        
+        .expense-category {
+            font-weight: 500;
+            color: #0f172a;
+            margin-bottom: 0.125rem;
+        }
+        
+        .expense-percentage {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .expense-amount {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        
+        /* Loading State */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(248, 250, 252, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+            border: 4px solid #e2e8f0;
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #10b981;
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+            max-width: 400px;
+        }
+        
+        .toast.error {
+            border-left-color: #f43f5e;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+        
+        .toast.hiding {
+            animation: slideOut 0.3s ease;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .card-value {
+                font-size: 1.5rem;
+            }
+            
+            .header-title h1 {
+                font-size: 1.25rem;
+            }
+            
+            .toast {
+                right: 1rem;
+                left: 1rem;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                    </div>
+                    <div class="header-title">
+                        <h1>Dashboard Financiero</h1>
+                        <p>Control de finanzas personales</p>
+                    </div>
+                </div>
+                <button id="refreshBtn" class="refresh-btn" onclick="loadData()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Actualizar
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main>
+        <div class="container">
+            <!-- Summary Cards -->
+            <div class="summary-grid">
+                <!-- Income Card -->
+                <div class="summary-card">
+                    <div class="card-content">
+                        <div>
+                            <div class="card-label">Total Ingresos</div>
+                            <div class="card-value income" id="totalIncome">0,00 €</div>
+                        </div>
+                        <div class="card-icon icon-income">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="16 12 12 8 8 12"></polyline>
+                                <line x1="12" y1="16" x2="12" y2="8"></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Expenses Card -->
+                <div class="summary-card">
+                    <div class="card-content">
+                        <div>
+                            <div class="card-label">Total Gastos</div>
+                            <div class="card-value expense" id="totalExpenses">0,00 €</div>
+                        </div>
+                        <div class="card-icon icon-expense">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="8 12 12 16 16 12"></polyline>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Balance Card -->
+                <div class="summary-card balance">
+                    <div class="card-content">
+                        <div>
+                            <div class="card-label">Dinero Disponible</div>
+                            <div class="card-value balance" id="availableBalance">0,00 €</div>
+                        </div>
+                        <div class="card-icon icon-balance">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                <line x1="1" y1="10" x2="23" y2="10"></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <!-- Pie Chart -->
+                <div class="chart-card">
+                    <h2 class="chart-title">Gastos por Categoría</h2>
+                    <div class="chart-container">
+                        <canvas id="pieChart"></canvas>
+                        <div id="pieChartEmpty" class="empty-state" style="display: none;">
+                            No hay datos de gastos
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Expense List -->
+                <div class="chart-card">
+                    <h2 class="chart-title">Resumen de Gastos</h2>
+                    <div id="expenseList" class="expense-list">
+                        <div class="empty-state">No hay gastos registrados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // ==================== ADVERTENCIA DE SEGURIDAD ====================
+        // TU TOKEN DE NOTION ESTÁ VISIBLE AQUÍ
+        // NO COMPARTAS ESTE ARCHIVO CON NADIE
+        // NO LO SUBAS A GITHUB PÚBLICO
+        // SOLO PARA USO LOCAL
+        // =================================================================
+        
+        // Configuración de Notion
+        const NOTION_CONFIG = {
+            token: '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',
+            incomeDatabaseId: '2d08b40bf29a81b8af39dcdfd7404d34',
+            expensesDatabaseId: '2d08b40bf29a81528595fe2d3da3e63b',
+            apiUrl: 'https://api.notion.com/v1',
+            version: '2022-06-28'
+        };
+        
+        // Colores para el gráfico
+        const CHART_COLORS = [
+            '#10b981', '#f43f5e', '#3b82f6', '#f59e0b',
+            '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
+        ];
+        
+        let pieChartInstance = null;
+        
+        // Función para mostrar loading
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = show;
+            if (show) {
+                btn.classList.add('loading');
+            } else {
+                btn.classList.remove('loading');
+            }
+        }
+        
+        // Función para mostrar toast
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = 'toast' + (isError ? ' error' : '');
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('hiding');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        // Función para formatear moneda
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('es-ES', {
+                style: 'currency',
+                currency: 'EUR'
+            }).format(amount);
+        }
+        
+        // Función para extraer valor de propiedad de Notion
+        function extractPropertyValue(propData) {
+            if (!propData) return null;
+            
+            const propType = propData.type;
+            
+            if (propType === 'title') {
+                const titleList = propData.title || [];
+                return titleList[0]?.plain_text || '';
+            } else if (propType === 'rich_text') {
+                const richTextList = propData.rich_text || [];
+                return richTextList[0]?.plain_text || '';
+            } else if (propType === 'number') {
+                return propData.number || 0;
+            } else if (propType === 'select') {
+                return propData.select?.name || '';
+            } else if (propType === 'date') {
+                return propData.date?.start || '';
+            }
+            
+            return null;
+        }
+        
+        // Función para consultar base de datos de Notion
+        async function queryNotionDatabase(databaseId) {
+            try {
+                const response = await fetch(`${NOTION_CONFIG.apiUrl}/databases/${databaseId}/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${NOTION_CONFIG.token}`,
+                        'Notion-Version': NOTION_CONFIG.version,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data.results || [];
+            } catch (error) {
+                console.error('Error querying Notion:', error);
+                throw error;
+            }
+        }
+        
+        // Función para cargar datos
+        async function loadData() {
+            showLoading(true);
+            
+            try {
+                // Consultar ambas bases de datos
+                const [incomeEntries, expenseEntries] = await Promise.all([
+                    queryNotionDatabase(NOTION_CONFIG.incomeDatabaseId),
+                    queryNotionDatabase(NOTION_CONFIG.expensesDatabaseId)
+                ]);
+                
+                // Calcular totales
+                let totalIncome = 0;
+                let totalExpenses = 0;
+                const categoryTotals = {};
+                
+                // Procesar ingresos
+                incomeEntries.forEach(page => {
+                    const props = page.properties || {};
+                    const amount = extractPropertyValue(props.Cantidad) || 0;
+                    totalIncome += amount;
+                });
+                
+                // Procesar gastos
+                expenseEntries.forEach(page => {
+                    const props = page.properties || {};
+                    const amount = extractPropertyValue(props.Cantidad) || 0;
+                    const category = extractPropertyValue(props.Categoría) || 'Sin categoría';
+                    
+                    if (!categoryTotals[category]) {
+                        categoryTotals[category] = 0;
+                    }
+                    categoryTotals[category] += amount;
+                    totalExpenses += amount;
+                });
+                
+                const availableBalance = totalIncome - totalExpenses;
+                
+                // Actualizar UI
+                document.getElementById('totalIncome').textContent = formatCurrency(totalIncome);
+                document.getElementById('totalExpenses').textContent = formatCurrency(totalExpenses);
+                document.getElementById('availableBalance').textContent = formatCurrency(availableBalance);
+                
+                // Preparar datos para gráfico
+                const expensesByCategory = Object.entries(categoryTotals).map(([category, amount]) => ({
+                    category,
+                    amount,
+                    percentage: totalExpenses > 0 ? (amount / totalExpenses * 100) : 0
+                }));
+                
+                // Actualizar gráfico y lista
+                updatePieChart(expensesByCategory);
+                updateExpenseList(expensesByCategory);
+                
+                showToast('Datos actualizados correctamente');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showToast('Error al cargar los datos', true);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Función para actualizar gráfico circular
+        function updatePieChart(data) {
+            const canvas = document.getElementById('pieChart');
+            const emptyState = document.getElementById('pieChartEmpty');
+            
+            if (data.length === 0) {
+                canvas.style.display = 'none';
+                emptyState.style.display = 'flex';
+                if (pieChartInstance) {
+                    pieChartInstance.destroy();
+                    pieChartInstance = null;
+                }
+                return;
+            }
+            
+            canvas.style.display = 'block';
+            emptyState.style.display = 'none';
+            
+            const ctx = canvas.getContext('2d');
+            
+            if (pieChartInstance) {
+                pieChartInstance.destroy();
+            }
+            
+            pieChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.category),
+                    datasets: [{
+                        data: data.map(d => d.amount),
+                        backgroundColor: CHART_COLORS,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    family: 'Inter',
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = formatCurrency(context.parsed);
+                                    const percentage = data[context.dataIndex].percentage.toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Función para actualizar lista de gastos
+        function updateExpenseList(data) {
+            const listContainer = document.getElementById('expenseList');
+            
+            if (data.length === 0) {
+                listContainer.innerHTML = '<div class="empty-state">No hay gastos registrados</div>';
+                return;
+            }
+            
+            listContainer.innerHTML = data.map((expense, index) => `
+                <div class="expense-item">
+                    <div class="expense-color" style="background-color: ${CHART_COLORS[index % CHART_COLORS.length]}"></div>
+                    <div class="expense-info">
+                        <div class="expense-category">${expense.category}</div>
+                        <div class="expense-percentage">${expense.percentage.toFixed(1)}% del total</div>
+                    </div>
+                    <div class="expense-amount">${formatCurrency(expense.amount)}</div>
+                </div>
+            `).join('');
+        }
+        
+        // Cargar datos al inicio
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+        });
+    </script>
+</body>
+</html>
