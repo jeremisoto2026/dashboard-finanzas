@@ -3,7 +3,7 @@
 
 // Configuración
 const NOTION_DATABASE_ID = 'd7571f97d90e42bb8e6e5c73f1c5ff5e';
-const YOUR_VERCEL_URL = 'https://dashboard-finanzas-nb9i0mu01-jeremis-projects-53da5f18.vercel.app/'; // CAMBIA ESTO por tu URL real de Vercel
+const YOUR_VERCEL_URL = 'https://dashboard-finanzas-nb9i0mu01-jeremis-projects-53da5f18.vercel.app'; // CAMBIA ESTO por tu URL real de Vercel
 
 // Elementos del DOM
 const datosDiv = document.getElementById('datos');
