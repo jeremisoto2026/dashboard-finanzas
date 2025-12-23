@@ -82,7 +82,7 @@ async function queryNotionDatabase(databaseId) {
     
     try {
         // USAR PROXY PÚBLICO para evitar CORS
-        const proxyUrl = 'https://api.allorigins.win/raw?url=';
+        const proxyUrl = 'https://corsproxy.io/?';
         const notionUrl = `${NOTION_CONFIG.apiUrl}/databases/${databaseId}/query`;
         
         const response = await fetch(proxyUrl + encodeURIComponent(notionUrl), {
