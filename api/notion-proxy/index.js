@@ -1,56 +1,60 @@
 // api/notion-proxy/index.js
-// Esta función se ejecutará en Vercel y actuará como intermediario.
+// Tu función segura en Vercel
 
-export default async function handler(request, response) {
-  // 1. Permitir que tu dashboard en GitHub Pages llame a esta función (CORS)
-  response.setHeader('Access-Control-Allow-Origin', 'https://jeremisoto2026.github.io');
-  response.setHeader('Access-Control-Allow-Methods', 'POST');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export default async function handler(req, res) {
+  // Permitir llamadas desde tu dashboard en GitHub Pages
+  res.setHeader('Access-Control-Allow-Origin', 'https://jeremisoto2026.github.io');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  // 2. Solo responder a peticiones POST
-  if (request.method !== 'POST') {
-    return response.status(405).json({ error: 'Método no permitido' });
+  // Manejar peticiones OPTIONS para CORS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  // Solo aceptar POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido. Usa POST.' });
   }
   
   try {
-    // 3. Obtener el ID de la base de datos que envía tu dashboard
-    const { databaseId } = await request.json();
+    const { databaseId } = await req.json();
     
     if (!databaseId) {
-      return response.status(400).json({ error: 'Falta databaseId' });
+      return res.status(400).json({ error: 'Falta el databaseId' });
     }
     
-    // 4. TU TOKEN DE NOTION (LO MÁS IMPORTANTE)
-    // Puedes ponerlo directo aquí, pero es MEJOR usar variable de entorno
-    const NOTION_TOKEN = process.env.NOTION_TOKEN || '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';
+    // TU TOKEN está seguro aquí (desde variables de entorno de Vercel)
+    const NOTION_TOKEN = process.env.NOTION_TOKEN;
     
-    // 5. Hacer la petición REAL a Notion (desde el servidor de Vercel, sin problemas de CORS)
-    const notionResponse = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+    if (!NOTION_TOKEN) {
+      return res.status(500).json({ error: 'Token no configurado en Vercel' });
+    }
+    
+    // Llamar a Notion desde el servidor de Vercel (sin problemas de CORS)
+    const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${NOTION_TOKEN}`,
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({}) // Cuerpo vacío para una consulta simple
+      body: JSON.stringify({})
     });
     
-    // 6. Si Notion devuelve error, lo pasamos a tu dashboard
-    if (!notionResponse.ok) {
-      const errorText = await notionResponse.text();
-      return response.status(notionResponse.status).json({ 
-        error: `Error de Notion: ${notionResponse.status}`,
-        details: errorText 
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error de Notion:', error);
+      return res.status(response.status).json({ 
+        error: `Error ${response.status} de Notion` 
       });
     }
     
-    // 7. Obtener los datos de Notion y enviarlos a tu dashboard
-    const data = await notionResponse.json();
-    return response.status(200).json(data);
+    const data = await response.json();
+    return res.status(200).json(data);
     
   } catch (error) {
-    // 8. Manejar cualquier error inesperado
     console.error('Error en el proxy:', error);
-    return response.status(500).json({ error: 'Error interno del servidor proxy' });
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
