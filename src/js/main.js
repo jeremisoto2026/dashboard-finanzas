@@ -1,24 +1,19 @@
 // ==================== DASHBOARD FINANCIERO ====================
-// Código principal del dashboard
+// Código con PROXY para evitar problemas de CORS
 // ==============================================================
 
-// Importar configuración
-import { NOTION_CONFIG, loadConfig, isConfigComplete, checkConfig } from './config.js';
+import { NOTION_CONFIG, loadConfig, isConfigComplete } from './config.js';
 
-// Colores para el gráfico
 const CHART_COLORS = [
     '#10b981', '#f43f5e', '#3b82f6', '#f59e0b',
     '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
 ];
 
 let pieChartInstance = null;
-
-// Hacer configuración globalmente accesible
 window.NOTION_CONFIG = NOTION_CONFIG;
 
 // ==================== FUNCIONES UTILITARIAS ====================
 
-// Función para mostrar loading
 function showLoading(show) {
     const loadingEl = document.getElementById('loading');
     const btn = document.getElementById('refreshBtn');
@@ -37,7 +32,6 @@ function showLoading(show) {
     }
 }
 
-// Función para mostrar toast
 function showToast(message, isError = false) {
     const toast = document.createElement('div');
     toast.className = 'toast' + (isError ? ' error' : '');
@@ -50,7 +44,6 @@ function showToast(message, isError = false) {
     }, 3000);
 }
 
-// Función para formatear moneda
 function formatCurrency(amount) {
     return new Intl.NumberFormat('es-ES', {
         style: 'currency',
@@ -58,7 +51,6 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
-// Función para extraer valor de propiedad de Notion
 function extractPropertyValue(propData) {
     if (!propData) return null;
     
@@ -81,16 +73,19 @@ function extractPropertyValue(propData) {
     return null;
 }
 
-// ==================== FUNCIONES DE NOTION API ====================
+// ==================== FUNCIÓN CON PROXY ====================
 
-// Función para consultar base de datos de Notion
 async function queryNotionDatabase(databaseId) {
     if (!NOTION_CONFIG.token) {
         throw new Error('Token de Notion no configurado');
     }
     
     try {
-        const response = await fetch(`${NOTION_CONFIG.apiUrl}/databases/${databaseId}/query`, {
+        // USAR PROXY PÚBLICO para evitar CORS
+        const proxyUrl = 'https://api.allorigins.win/raw?url=';
+        const notionUrl = `${NOTION_CONFIG.apiUrl}/databases/${databaseId}/query`;
+        
+        const response = await fetch(proxyUrl + encodeURIComponent(notionUrl), {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${NOTION_CONFIG.token}`,
@@ -101,10 +96,7 @@ async function queryNotionDatabase(databaseId) {
         });
         
         if (!response.ok) {
-            if (response.status === 401) {
-                throw new Error('Token de Notion inválido o expirado');
-            }
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
+            throw new Error(`Error ${response.status}`);
         }
         
         const data = await response.json();
@@ -117,37 +109,31 @@ async function queryNotionDatabase(databaseId) {
 
 // ==================== FUNCIÓN PRINCIPAL ====================
 
-// Función para cargar datos
 async function loadData() {
-    // Verificar configuración primero
-    if (!checkConfig()) {
+    if (!isConfigComplete()) {
         showToast('Configura primero tus credenciales de Notion (botón ⚙️)', true);
-        toggleConfig(); // Mostrar panel de configuración
+        toggleConfig();
         return;
     }
     
     showLoading(true);
     
     try {
-        // Consultar ambas bases de datos
         const [incomeEntries, expenseEntries] = await Promise.all([
             queryNotionDatabase(NOTION_CONFIG.incomeDatabaseId),
             queryNotionDatabase(NOTION_CONFIG.expensesDatabaseId)
         ]);
         
-        // Calcular totales
         let totalIncome = 0;
         let totalExpenses = 0;
         const categoryTotals = {};
         
-        // Procesar ingresos
         incomeEntries.forEach(page => {
             const props = page.properties || {};
             const amount = extractPropertyValue(props.Cantidad) || 0;
             totalIncome += amount;
         });
         
-        // Procesar gastos
         expenseEntries.forEach(page => {
             const props = page.properties || {};
             const amount = extractPropertyValue(props.Cantidad) || 0;
@@ -162,19 +148,16 @@ async function loadData() {
         
         const availableBalance = totalIncome - totalExpenses;
         
-        // Actualizar UI
         document.getElementById('totalIncome').textContent = formatCurrency(totalIncome);
         document.getElementById('totalExpenses').textContent = formatCurrency(totalExpenses);
         document.getElementById('availableBalance').textContent = formatCurrency(availableBalance);
         
-        // Preparar datos para gráfico
         const expensesByCategory = Object.entries(categoryTotals).map(([category, amount]) => ({
             category,
             amount,
             percentage: totalExpenses > 0 ? (amount / totalExpenses * 100) : 0
         }));
         
-        // Actualizar gráfico y lista
         updatePieChart(expensesByCategory);
         updateExpenseList(expensesByCategory);
         
@@ -184,7 +167,6 @@ async function loadData() {
         console.error('Error cargando datos:', error);
         showToast(`❌ Error: ${error.message}`, true);
         
-        // Limpiar datos en caso de error
         document.getElementById('totalIncome').textContent = '0,00 €';
         document.getElementById('totalExpenses').textContent = '0,00 €';
         document.getElementById('availableBalance').textContent = '0,00 €';
@@ -196,9 +178,6 @@ async function loadData() {
     }
 }
 
-// ==================== FUNCIONES DE UI ====================
-
-// Función para actualizar gráfico circular
 function updatePieChart(data) {
     const canvas = document.getElementById('pieChart');
     const emptyState = document.getElementById('pieChartEmpty');
@@ -264,7 +243,6 @@ function updatePieChart(data) {
     });
 }
 
-// Función para actualizar lista de gastos
 function updateExpenseList(data) {
     const listContainer = document.getElementById('expenseList');
     if (!listContainer) return;
@@ -286,17 +264,14 @@ function updateExpenseList(data) {
     `).join('');
 }
 
-// ==================== FUNCIONES DE CONFIGURACIÓN ====================
+// ==================== CONFIGURACIÓN ====================
 
-// Mostrar/ocultar panel de configuración
 function toggleConfig() {
     const panel = document.getElementById('configPanel');
     if (!panel) return;
     
     if (panel.style.display === 'none' || panel.style.display === '') {
         panel.style.display = 'block';
-        
-        // Llenar campos con valores actuales
         document.getElementById('cfgToken').value = NOTION_CONFIG.token || '';
         document.getElementById('cfgIncome').value = NOTION_CONFIG.incomeDatabaseId || '';
         document.getElementById('cfgExpenses').value = NOTION_CONFIG.expensesDatabaseId || '';
@@ -305,13 +280,11 @@ function toggleConfig() {
     }
 }
 
-// Guardar configuración desde UI
-function saveConfiguration() {
+async function saveConfiguration() {
     const token = document.getElementById('cfgToken').value.trim();
     const incomeDb = document.getElementById('cfgIncome').value.trim();
     const expensesDb = document.getElementById('cfgExpenses').value.trim();
     
-    // Validaciones básicas
     if (!token) {
         showToast('❌ El token de Notion es requerido', true);
         return;
@@ -332,39 +305,29 @@ function saveConfiguration() {
         return;
     }
     
-    // Importar función saveConfig del módulo config
-    import('./config.js').then(module => {
-        // Guardar configuración
-        module.saveConfig(token, incomeDb, expensesDb);
-        
-        // Cerrar panel
-        toggleConfig();
-        
-        // Mostrar mensaje de éxito
-        showToast('✅ Configuración guardada correctamente');
-        
-        // Recargar datos automáticamente después de 1 segundo
-        setTimeout(() => {
-            loadData();
-        }, 1000);
-    });
+    // Importar y usar saveConfig
+    const module = await import('./config.js');
+    module.saveConfig(token, incomeDb, expensesDb);
+    
+    toggleConfig();
+    showToast('✅ Configuración guardada correctamente');
+    
+    setTimeout(() => {
+        loadData();
+    }, 1000);
 }
 
 // ==================== INICIALIZACIÓN ====================
 
-// Cargar configuración al inicio
 loadConfig();
 
-// Hacer funciones accesibles globalmente
 window.loadData = loadData;
 window.toggleConfig = toggleConfig;
 window.saveConfiguration = saveConfiguration;
 
-// Cargar datos cuando la página esté lista
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Dashboard financiero cargado');
     
-    // Cargar datos automáticamente si la configuración está completa
     if (isConfigComplete()) {
         console.log('⚡ Configuración completa, cargando datos...');
         setTimeout(() => {
