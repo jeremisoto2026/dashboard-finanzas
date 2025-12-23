@@ -1,337 +1,178 @@
-// ==================== DASHBOARD FINANCIERO ====================
-// Código con PROXY ULTRA-CONFIABLE que evita CORS
-// ==============================================================
+// src/js/main.js
+// Código completo con la función proxy de Vercel
 
-import { NOTION_CONFIG, loadConfig, isConfigComplete, saveConfig } from './config.js';
+// Configuración
+const NOTION_DATABASE_ID = 'd7571f97d90e42bb8e6e5c73f1c5ff5e';
+const YOUR_VERCEL_URL = 'https://dashboard-finanzas-nb9i0mu01-jeremis-projects-53da5f18.vercel.app/'; // CAMBIA ESTO por tu URL real de Vercel
 
-const CHART_COLORS = [
-    '#10b981', '#f43f5e', '#3b82f6', '#f59e0b',
-    '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
-];
+// Elementos del DOM
+const datosDiv = document.getElementById('datos');
+const loadingDiv = document.getElementById('loading');
+const errorDiv = document.getElementById('error');
+const actualizarBtn = document.getElementById('actualizar');
 
-let pieChartInstance = null;
-window.NOTION_CONFIG = NOTION_CONFIG;
-
-// ==================== FUNCIONES UTILITARIAS ====================
-
-function showLoading(show) {
-    const loadingEl = document.getElementById('loading');
-    const btn = document.getElementById('refreshBtn');
-    if (loadingEl) loadingEl.style.display = show ? 'flex' : 'none';
-    if (btn) {
-        btn.disabled = show;
-        show ? btn.classList.add('loading') : btn.classList.remove('loading');
-    }
-}
-
-function showToast(message, isError = false) {
-    const existingToast = document.querySelector('.toast');
-    if (existingToast) existingToast.remove();
-    
-    const toast = document.createElement('div');
-    toast.className = 'toast' + (isError ? ' error' : '');
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.classList.add('hiding');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('es-ES', {
+// Función para formatear números como moneda
+function formatoMoneda(valor) {
+    return new Intl.NumberFormat('es-AR', {
         style: 'currency',
-        currency: 'EUR'
-    }).format(amount);
+        currency: 'ARS'
+    }).format(valor);
 }
 
-function extractPropertyValue(propData) {
-    if (!propData) return null;
-    const propType = propData.type;
-    if (propType === 'title') {
-        const titleList = propData.title || [];
-        return titleList[0]?.plain_text || '';
-    } else if (propType === 'rich_text') {
-        const richTextList = propData.rich_text || [];
-        return richTextList[0]?.plain_text || '';
-    } else if (propType === 'number') {
-        return propData.number || 0;
-    } else if (propType === 'select') {
-        return propData.select?.name || '';
-    } else if (propType === 'date') {
-        return propData.date?.start || '';
-    }
-    return null;
+// Función para formatear fechas
+function formatoFecha(fechaStr) {
+    const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(fechaStr).toLocaleDateString('es-AR', opciones);
 }
 
-// ==================== PROXY ULTRA-CONFIABLE ====================
-// Usa un servicio público y probado. Cambia solo si es necesario.
-const PROXY_URL = 'https://cors-anywhere.herokuapp.com/';
-// const PROXY_URL = 'https://api.allorigins.win/raw?url='; // Alternativa
-
+// FUNCIÓN ACTUALIZADA: Usa el proxy de Vercel
 async function queryNotionDatabase(databaseId) {
-    if (!NOTION_CONFIG.token) throw new Error('Token no configurado');
-    if (!databaseId) throw new Error('ID de base de datos no proporcionado');
-
     try {
-        const targetUrl = `${NOTION_CONFIG.apiUrl}/databases/${databaseId}/query`;
-        const proxiedUrl = PROXY_URL + encodeURIComponent(targetUrl);
+        // URL de TU función en Vercel - IMPORTANTE: Cambia por tu URL real
+        const proxyUrl = `${YOUR_VERCEL_URL}/api/notion-proxy`;
         
-        console.log('🔗 Llamando a Notion via Proxy...');
-        const response = await fetch(proxiedUrl, {
+        console.log('📡 Llamando a tu proxy en Vercel...');
+        console.log('URL:', proxyUrl);
+        console.log('Database ID:', databaseId);
+        
+        const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${NOTION_CONFIG.token}`,
-                'Notion-Version': NOTION_CONFIG.version,
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
             },
-            body: JSON.stringify({})
+            body: JSON.stringify({
+                databaseId: databaseId
+            })
         });
-
-        console.log('📡 Status de respuesta:', response.status);
+        
+        console.log('✅ Respuesta recibida de Vercel, status:', response.status);
+        
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Cuerpo del error:', errorText);
-            if (response.status === 401) throw new Error('401 - Token inválido o expirado');
-            if (response.status === 403) throw new Error('403 - No tienes permisos para esta base de datos. ¿La compartiste con la integración en Notion?');
-            if (response.status === 404) throw new Error('404 - Base de datos no encontrada. Revisa el ID.');
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Error ${response.status}: ${errorData.error || 'Error desconocido'}`);
         }
-
+        
         const data = await response.json();
-        console.log(`✅ OK. Encontrados ${data.results?.length || 0} registros.`);
         return data.results || [];
         
     } catch (error) {
-        console.error('❌ Error en queryNotionDatabase:', error);
-        // Intento con proxy alternativo si el principal falla por red/CORS
-        if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
-            console.log('🔄 Intentando con proxy alternativo...');
-            return tryAlternativeProxy(databaseId);
-        }
-        throw error; // Relanza otros errores (401, 404, etc.)
+        console.error('❌ Error al llamar al proxy de Vercel:', error);
+        throw new Error(`No se pudieron cargar los datos: ${error.message}`);
     }
 }
 
-async function tryAlternativeProxy(databaseId) {
-    const altProxy = 'https://api.codetabs.com/v1/proxy?quest=';
-    const targetUrl = `${NOTION_CONFIG.apiUrl}/databases/${databaseId}/query`;
-    const proxiedUrl = altProxy + encodeURIComponent(targetUrl);
-    
-    const response = await fetch(proxiedUrl, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${NOTION_CONFIG.token}`,
-            'Notion-Version': NOTION_CONFIG.version,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-    });
-    
-    if (!response.ok) throw new Error(`Proxy alternativo falló: ${response.status}`);
-    const data = await response.json();
-    return data.results || [];
-}
-
-// ==================== FUNCIÓN PRINCIPAL ====================
-
-async function loadData() {
-    console.log('🚀 Iniciando carga de datos...');
-    if (!isConfigComplete()) {
-        showToast('Configura primero tus credenciales (botón ⚙️)', true);
-        setTimeout(toggleConfig, 500);
-        return;
+// Función para procesar y mostrar los datos
+function procesarDatos(results) {
+    if (!results || results.length === 0) {
+        return '<p>No hay transacciones registradas.</p>';
     }
     
-    showLoading(true);
-    try {
-        const [incomeEntries, expenseEntries] = await Promise.all([
-            queryNotionDatabase(NOTION_CONFIG.incomeDatabaseId),
-            queryNotionDatabase(NOTION_CONFIG.expensesDatabaseId)
-        ]);
+    let html = '';
+    let totalIngresos = 0;
+    let totalGastos = 0;
+    
+    results.forEach(page => {
+        const propiedades = page.properties;
         
-        let totalIncome = 0, totalExpenses = 0;
-        const categoryTotals = {};
+        // Extraer los valores de las propiedades
+        const monto = propiedades.Monto?.number || 0;
+        const categoria = propiedades.Categoría?.select?.name || 'Sin categoría';
+        const descripcion = propiedades.Descripción?.title?.[0]?.plain_text || 'Sin descripción';
+        const fecha = propiedades.Fecha?.date?.start || 'Sin fecha';
+        const tipo = propiedades.Tipo?.select?.name || 'Sin tipo';
         
-        incomeEntries.forEach(page => {
-            const amount = extractPropertyValue(page.properties?.Cantidad) || 0;
-            totalIncome += amount;
-        });
-        
-        expenseEntries.forEach(page => {
-            const amount = extractPropertyValue(page.properties?.Cantidad) || 0;
-            const category = extractPropertyValue(page.properties?.Categoría) || 'Sin categoría';
-            categoryTotals[category] = (categoryTotals[category] || 0) + amount;
-            totalExpenses += amount;
-        });
-        
-        const availableBalance = totalIncome - totalExpenses;
-        document.getElementById('totalIncome').textContent = formatCurrency(totalIncome);
-        document.getElementById('totalExpenses').textContent = formatCurrency(totalExpenses);
-        document.getElementById('availableBalance').textContent = formatCurrency(availableBalance);
-        
-        const expensesByCategory = Object.entries(categoryTotals).map(([category, amount]) => ({
-            category,
-            amount,
-            percentage: totalExpenses > 0 ? (amount / totalExpenses * 100) : 0
-        }));
-        
-        updatePieChart(expensesByCategory);
-        updateExpenseList(expensesByCategory);
-        
-        const totalEntries = incomeEntries.length + expenseEntries.length;
-        if (totalEntries === 0) {
-            showToast('ℹ️ Bases de datos vacías. Agrega registros en Notion.');
-        } else {
-            showToast(`✅ Datos cargados: ${incomeEntries.length} ingresos, ${expenseEntries.length} gastos`);
+        // Acumular totales
+        if (tipo.toLowerCase() === 'ingreso') {
+            totalIngresos += monto;
+        } else if (tipo.toLowerCase() === 'gasto') {
+            totalGastos += monto;
         }
         
-    } catch (error) {
-        console.error('❌ Error FATAL en loadData:', error);
-        let userMessage = 'Error al cargar datos';
-        if (error.message.includes('401')) userMessage = 'Token inválido. Cópialo bien de Notion.';
-        if (error.message.includes('403')) userMessage = 'Falta compartir la base de datos con la integración en Notion.';
-        if (error.message.includes('404')) userMessage = 'ID de base de datos incorrecto.';
-        if (error.message.includes('Failed to fetch')) userMessage = 'Error de red/proxy. Intenta de nuevo.';
-        showToast(`❌ ${userMessage}`, true);
+        // Determinar clase CSS según el tipo
+        const claseTipo = tipo.toLowerCase() === 'ingreso' ? 'ingreso' : 'gasto';
         
-        // Reset UI
-        document.getElementById('totalIncome').textContent = '0,00 €';
-        document.getElementById('totalExpenses').textContent = '0,00 €';
-        document.getElementById('availableBalance').textContent = '0,00 €';
-        updatePieChart([]);
-        updateExpenseList([]);
-    } finally {
-        showLoading(false);
-    }
-}
-
-function updatePieChart(data) {
-    const canvas = document.getElementById('pieChart');
-    const emptyState = document.getElementById('pieChartEmpty');
-    if (!canvas || !emptyState) return;
-    
-    if (data.length === 0) {
-        canvas.style.display = 'none';
-        emptyState.style.display = 'flex';
-        if (pieChartInstance) { pieChartInstance.destroy(); pieChartInstance = null; }
-        return;
-    }
-    
-    canvas.style.display = 'block';
-    emptyState.style.display = 'none';
-    const ctx = canvas.getContext('2d');
-    
-    if (pieChartInstance) pieChartInstance.destroy();
-    pieChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: data.map(d => d.category),
-            datasets: [{
-                data: data.map(d => d.amount),
-                backgroundColor: CHART_COLORS,
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: { position: 'bottom', labels: { padding: 15, font: { family: 'Inter', size: 12 } } },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = formatCurrency(context.parsed);
-                            const percentage = data[context.dataIndex].percentage.toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-function updateExpenseList(data) {
-    const listContainer = document.getElementById('expenseList');
-    if (!listContainer) return;
-    
-    if (data.length === 0) {
-        listContainer.innerHTML = '<div class="empty-state">No hay gastos registrados</div>';
-        return;
-    }
-    
-    data.sort((a, b) => b.amount - a.amount);
-    listContainer.innerHTML = data.map((expense, index) => `
-        <div class="expense-item">
-            <div class="expense-color" style="background-color: ${CHART_COLORS[index % CHART_COLORS.length]}"></div>
-            <div class="expense-info">
-                <div class="expense-category">${expense.category}</div>
-                <div class="expense-percentage">${expense.percentage.toFixed(1)}% del total</div>
+        // Crear tarjeta para cada transacción
+        html += `
+        <div class="transaccion ${claseTipo}">
+            <div class="transaccion-header">
+                <span class="categoria">${categoria}</span>
+                <span class="monto ${claseTipo}">${formatoMoneda(monto)}</span>
             </div>
-            <div class="expense-amount">${formatCurrency(expense.amount)}</div>
+            <div class="transaccion-body">
+                <p class="descripcion">${descripcion}</p>
+                <div class="transaccion-footer">
+                    <span class="fecha">${formatoFecha(fecha)}</span>
+                    <span class="tipo ${claseTipo}">${tipo}</span>
+                </div>
+            </div>
         </div>
-    `).join('');
+        `;
+    });
+    
+    // Calcular balance
+    const balance = totalIngresos - totalGastos;
+    
+    // Agregar resumen al inicio
+    const resumenHtml = `
+    <div class="resumen">
+        <div class="resumen-item">
+            <h3>Ingresos</h3>
+            <p class="ingreso">${formatoMoneda(totalIngresos)}</p>
+        </div>
+        <div class="resumen-item">
+            <h3>Gastos</h3>
+            <p class="gasto">${formatoMoneda(totalGastos)}</p>
+        </div>
+        <div class="resumen-item">
+            <h3>Balance</h3>
+            <p class="${balance >= 0 ? 'ingreso' : 'gasto'}">${formatoMoneda(balance)}</p>
+        </div>
+    </div>
+    `;
+    
+    return resumenHtml + html;
 }
 
-// ==================== CONFIGURACIÓN ====================
-
-function toggleConfig() {
-    const panel = document.getElementById('configPanel');
-    if (!panel) return;
-    
-    if (panel.style.display === 'none' || panel.style.display === '') {
-        panel.style.display = 'block';
-        document.getElementById('cfgToken').value = NOTION_CONFIG.token || '';
-        document.getElementById('cfgIncome').value = NOTION_CONFIG.incomeDatabaseId || '';
-        document.getElementById('cfgExpenses').value = NOTION_CONFIG.expensesDatabaseId || '';
-    } else {
-        panel.style.display = 'none';
-    }
-}
-
-async function saveConfiguration() {
-    const token = document.getElementById('cfgToken').value.trim();
-    const incomeDb = document.getElementById('cfgIncome').value.trim();
-    const expensesDb = document.getElementById('cfgExpenses').value.trim();
-    
-    if (!token || !token.startsWith('ntn_')) {
-        showToast('❌ Token inválido. Debe comenzar con "ntn_"', true);
-        return;
-    }
-    if (!incomeDb || incomeDb.length < 10 || !expensesDb || expensesDb.length < 10) {
-        showToast('❌ IDs de bases de datos inválidos', true);
-        return;
-    }
-    
+// Función para cargar y mostrar los datos
+async function cargarDatos() {
     try {
-        saveConfig(token, incomeDb, expensesDb);
-        toggleConfig();
-        showToast('✅ Configuración guardada. Cargando datos...');
-        setTimeout(loadData, 800);
+        // Mostrar estado de carga
+        loadingDiv.style.display = 'block';
+        errorDiv.style.display = 'none';
+        datosDiv.innerHTML = '';
+        
+        console.log('🔄 Iniciando carga de datos...');
+        
+        // Obtener datos de Notion a través del proxy de Vercel
+        const results = await queryNotionDatabase(NOTION_DATABASE_ID);
+        
+        console.log(`✅ ${results.length} transacciones obtenidas`);
+        
+        // Procesar y mostrar los datos
+        datosDiv.innerHTML = procesarDatos(results);
+        
+        // Ocultar estado de carga
+        loadingDiv.style.display = 'none';
+        
     } catch (error) {
-        showToast(`❌ Error al guardar: ${error.message}`, true);
+        console.error('❌ Error en cargarDatos:', error);
+        
+        // Mostrar error
+        loadingDiv.style.display = 'none';
+        errorDiv.style.display = 'block';
+        errorDiv.innerHTML = `
+            <h3>Error al cargar los datos</h3>
+            <p>${error.message}</p>
+            <p>Por favor, intenta nuevamente.</p>
+        `;
     }
 }
 
-// ==================== INICIALIZACIÓN ====================
+// Event Listeners
+actualizarBtn.addEventListener('click', cargarDatos);
 
-loadConfig();
-window.loadData = loadData;
-window.toggleConfig = toggleConfig;
-window.saveConfiguration = saveConfiguration;
+// Cargar datos al iniciar
+document.addEventListener('DOMContentLoaded', cargarDatos);
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Dashboard financiero inicializado.');
-    if (isConfigComplete()) {
-        console.log('⚡ Configuración completa. Auto-cargando datos en 1s...');
-        setTimeout(loadData, 1000);
-    } else {
-        console.log('ℹ️ Esperando configuración del usuario.');
-        setTimeout(() => showToast('Configura tus credenciales de Notion (botón ⚙️)', false), 1500);
-    }
-});
+// Opcional: Recargar automáticamente cada 5 minutos
+setInterval(cargarDatos, 5 * 60 * 1000);
